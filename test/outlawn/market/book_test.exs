@@ -1,5 +1,6 @@
 defmodule Outlawn.Market.BookTest do
   use ExUnit.Case, async: true
+
   require Decimal, as: D
 
   setup do

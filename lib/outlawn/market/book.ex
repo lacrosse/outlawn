@@ -6,33 +6,33 @@ defmodule Outlawn.Market.Book do
     GenServer.start_link(__MODULE__, %{inst: inst, asks: [], bids: []})
   end
 
+  def orders_by_trader(book, trader), do: book |> GenServer.call({:orders_by_trader, trader})
+
   def asks(book), do: book |> GenServer.call(:asks)
   def bids(book), do: book |> GenServer.call(:bids)
 
-  def lowest_ask(book) do
-    book |> GenServer.call(:lowest_ask)
-  end
-
-  def highest_bid(book) do
-    book |> GenServer.call(:highest_bid)
-  end
-
-  def place_order(book, trader, action, lot) do
-    book |> GenServer.call({:place_order, trader, action, lot})
-  end
+  def lowest_ask(book), do: book |> GenServer.call(:lowest_ask)
+  def highest_bid(book), do: book |> GenServer.call(:highest_bid)
+  def place_order(book, trader, action, lot), do: book |> GenServer.call({:place_order, trader, action, lot})
 
   # Server
 
   def init(state), do: {:ok, state}
 
+  def handle_call({:orders_by_trader, trader}, _from, %{asks: a, bids: b} = s) do
+    orders = %{
+      asks: a |> Enum.filter(fn {_, _, o_trader} -> o_trader == trader end),
+      bids: b |> Enum.filter(fn {_, _, o_trader} -> o_trader == trader end)
+    }
+
+    {:reply, orders, s}
+  end
   def handle_call(:asks, _from, %{asks: a} = s), do: {:reply, a, s}
   def handle_call(:bids, _from, %{bids: b} = s), do: {:reply, b, s}
   def handle_call(:lowest_ask, _from, %{asks: a} = s), do: {:reply, first_or_none(a), s}
   def handle_call(:highest_bid, _from, %{bids: b} = s), do: {:reply, first_or_none(b), s}
   def handle_call({:place_order, trader, action, lot}, _from, state) do
-    {executed_orders, new_state} =
-      state
-      |> match_and_queue_order(trader, action, lot)
+    {executed_orders, new_state} = match_and_queue_order(state, trader, action, lot)
 
     {:reply, {:ok, executed_orders}, new_state}
   end
@@ -93,12 +93,10 @@ defmodule Outlawn.Market.Book do
 
   defp queue_order(market, action, order) do
     {lead, tail} = queue_order(market, action, order, [])
-    Enum.reduce(lead, tail, fn x, acc -> [x|acc] end)
+    Enum.reduce(lead, tail, &[&1|&2])
   end
   defp queue_order(market, _, nil, lead), do: {lead, market}
-  defp queue_order([], _, order, lead) do
-    {lead, [order]}
-  end
+  defp queue_order([], _, order, lead), do: {lead, [order]}
   defp queue_order([{m_price, _, _} = m_order|tail] = market, action, {t_price, _, _} = t_order, lead) do
     comparison_symbol = action_to_make_comparison(action)
 

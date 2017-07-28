@@ -36,7 +36,6 @@ config :logger, :console, format: "[$level] $message\n"
 # in production as building large stacktraces may be expensive.
 config :phoenix, :stacktrace_depth, 20
 
-# Configure your database
 config :outlawn, Outlawn.Repo,
   adapter: Ecto.Adapters.Postgres,
   username: "postgres",
@@ -44,3 +43,16 @@ config :outlawn, Outlawn.Repo,
   database: "outlawn_dev",
   hostname: "localhost",
   pool_size: 10
+
+config :outlawn, Outlawn.Access,
+  algorithm: "ES512",
+  jwk: %{
+    "crv" => "P-521",
+    "d" => "MjRzOtCS-X8dp6ZbqyLuT8IdLBl-4UxljkVWbW4inYDAF8KGJ8N911syGjYXBZ_ZBdRsskq-uOCWQ0uSQ1B6r94",
+    "kty" => "EC",
+    "x" => "Aee9WKFmyAdcydDydA4gO9lHyi24XIwnMc-RGhJum--bgOjX-FGIGVT43aywXWCrwJ_Z01iD75xNAJidk4wz70kZ",
+    "y" => "AK7vrjyvQ-AyresyhVEjVJ9b1GwGZ0ymSa3NCqi77LqtvvvVD1YUEJdxtBaW2mLNh5leokIo9VrhPPWTndvUzAfq"
+  }
+
+config :bcrypt_elixir,
+  log_rounds: 4

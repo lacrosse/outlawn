@@ -5,7 +5,21 @@ defmodule OutlawnWeb.Router do
     plug :accepts, ["json"]
   end
 
-  scope "/api", OutlawnWeb do
+  pipeline :protected do
+    plug Outlawn.Access.Authenticator
+  end
+
+  scope "/api", OutlawnWeb.API do
     pipe_through :api
+
+    resources "/users", UserController, only: [:create], singleton: true
+  end
+
+  scope "/api", OutlawnWeb.API do
+    pipe_through [:api, :protected]
+
+    resources "/markets", MarketController, only: [], name: :book do
+      resources "/orders", OrderController, only: [:index]
+    end
   end
 end

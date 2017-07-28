@@ -33,6 +33,9 @@ defmodule Outlawn.Mixfile do
       {:gettext, "~> 0.11"},
       {:cowboy, "~> 1.0"},
       {:decimal, "~> 1.0"},
+      {:comeonin, "~> 4.0.0"},
+      {:bcrypt_elixir, "~> 0.12"},
+      {:jose, "~> 1.8.4"},
       {:mix_test_watch, "~> 0.3", only: :dev, runtime: false}
     ]
   end
