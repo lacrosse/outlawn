@@ -7,6 +7,7 @@ defmodule Outlawn.Market do
 
   def start_link(), do: GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
 
+  def find_book(inst) when is_binary(inst), do: inst |> book_id_to_tuple() |> find_book()
   def find_book(inst), do: GenServer.call(__MODULE__, {:find_book, inst})
   def create_book(inst), do: GenServer.call(__MODULE__, {:create_book, inst})
 
@@ -69,4 +70,12 @@ defmodule Outlawn.Market do
 
   defp log_info(string), do: Logger.info("[Outlawn.Market] " <> string)
   defp log_error(string), do: Logger.error("[Outlawn.Market] " <> string)
+
+  defp book_id_to_tuple(<<to::binary-size(3), from::binary-size(3)>>) do
+    {inst_string_to_symbol(to), inst_string_to_symbol(from)}
+  end
+
+  defp inst_string_to_symbol("ETH"), do: :eth
+  defp inst_string_to_symbol("XMR"), do: :xmr
+  defp inst_string_to_symbol("BTC"), do: :btc
 end

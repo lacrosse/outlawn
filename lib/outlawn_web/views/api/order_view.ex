@@ -4,13 +4,17 @@ defmodule OutlawnWeb.API.OrderView do
   def render("index.json", %{orders: %{asks: a, bids: b}}) do
     %{
       orders: %{
-        asks: a |> Enum.map(&render("show.json", %{order: &1})),
-        bids: b |> Enum.map(&render("show.json", %{order: &1}))
+        asks: a |> Enum.map(&one/1),
+        bids: b |> Enum.map(&one/1)
       }
     }
   end
 
-  def render("show.json", %{order: {price, amount, _}}) do
+  def render("executed.json", %{executed: executed}) when is_list(executed) do
+    %{status: "ok"}
+  end
+
+  def one({price, amount, _}) do
     %{
       price: price,
       amount: amount

@@ -19,7 +19,7 @@ defmodule OutlawnWeb.Router do
     pipe_through [:api, :protected]
 
     resources "/markets", MarketController, only: [], name: :book do
-      resources "/orders", OrderController, only: [:index]
+      resources "/orders", OrderController, only: [:index, :create]
     end
   end
 end
