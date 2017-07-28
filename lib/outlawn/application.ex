@@ -6,7 +6,8 @@ defmodule Outlawn.Application do
 
     children = [
       supervisor(Outlawn.Repo, []),
-      supervisor(OutlawnWeb.Endpoint, []),
+      supervisor(Outlawn.Market.Supervisor, []),
+      supervisor(OutlawnWeb.Endpoint, [])
     ]
 
     opts = [strategy: :one_for_one, name: Outlawn.Supervisor]
