@@ -17,18 +17,18 @@ defmodule Outlawn.Market.BookTest do
     anton = make_ref()
     arnold = make_ref()
 
-    {:ok, []} =
+    {:ok, {id_1, _, _, _}, []} =
       book
-      |> Outlawn.Market.Book.place_order(arnold, :sell, {D.new("59.01"), 10000})
-    {:ok, []} =
+      |> Outlawn.Market.Book.place_order(:sell, {D.new("59.01"), 10000, arnold})
+    {:ok, {id_2, _, _, _}, []} =
       book
-      |> Outlawn.Market.Book.place_order(anton, :buy, {D.new("59.0"), 100})
+      |> Outlawn.Market.Book.place_order(:buy, {D.new("59.0"), 100, anton})
 
     assert book |> Outlawn.Market.Book.bids() == [
-      {D.new("59.0"), 100, anton}
+      {id_2, D.new("59.0"), 100, anton}
     ]
     assert book |> Outlawn.Market.Book.asks() == [
-      {D.new("59.01"), 10000, arnold}
+      {id_1, D.new("59.01"), 10000, arnold}
     ]
   end
 
@@ -36,17 +36,19 @@ defmodule Outlawn.Market.BookTest do
     anton = make_ref()
     arnold = make_ref()
 
-    {:ok, []} =
-      book
-      |> Outlawn.Market.Book.place_order(arnold, :sell, {D.new("59.01"), 10000})
-    {:ok, executed} =
-      book
-      |> Outlawn.Market.Book.place_order(anton, :buy, {D.new("59.1"), 100})
+    price = D.new("59.01")
 
-    assert executed == [{D.new("59.01"), 100, arnold}]
+    {:ok, {id_1, _, _, _}, []} =
+      book
+      |> Outlawn.Market.Book.place_order(:sell, {price, 10000, arnold})
+    {:ok, _, txns} =
+      book
+      |> Outlawn.Market.Book.place_order(:buy, {D.new("59.1"), 100, anton})
+
+    assert [{_, ^price, 100}] = txns
     assert book |> Outlawn.Market.Book.bids() == []
     assert book |> Outlawn.Market.Book.asks() == [
-      {D.new("59.01"), 9900, arnold}
+      {id_1, price, 9900, arnold}
     ]
   end
 
@@ -54,28 +56,30 @@ defmodule Outlawn.Market.BookTest do
     anton = make_ref()
     arnold = make_ref()
 
-    {:ok, []} =
+    {:ok, {id_1, _, _, _}, []} =
       book
-      |> Outlawn.Market.Book.place_order(arnold, :sell, {D.new("59.5"), 100})
-    {:ok, []} =
+      |> Outlawn.Market.Book.place_order(:sell, {D.new("59.5"), 100, arnold})
+    price_2 = D.new("59.02")
+    {:ok, _, []} =
       book
-      |> Outlawn.Market.Book.place_order(arnold, :sell, {D.new("59.02"), 100})
-    {:ok, []} =
+      |> Outlawn.Market.Book.place_order(:sell, {price_2, 100, arnold})
+    price_3 = D.new("59.01")
+    {:ok, _, []} =
       book
-      |> Outlawn.Market.Book.place_order(arnold, :sell, {D.new("59.01"), 100})
-    {:ok, executed} =
+      |> Outlawn.Market.Book.place_order(:sell, {price_3, 100, arnold})
+    {:ok, {id_4, _, _, _}, txns} =
       book
-      |> Outlawn.Market.Book.place_order(anton, :buy, {D.new("59.1"), 293})
+      |> Outlawn.Market.Book.place_order(:buy, {D.new("59.1"), 293, anton})
 
-    assert executed == [
-      {D.new("59.02"), 100, arnold},
-      {D.new("59.01"), 100, arnold}
-    ]
+    assert [
+      {_, ^price_2, 100},
+      {_, ^price_3, 100}
+    ] = txns
     assert book |> Outlawn.Market.Book.bids() == [
-      {D.new("59.1"), 93, anton}
+      {id_4, D.new("59.1"), 93, anton}
     ]
     assert book |> Outlawn.Market.Book.asks() == [
-      {D.new("59.5"), 100, arnold}
+      {id_1, D.new("59.5"), 100, arnold}
     ]
   end
 
@@ -83,28 +87,30 @@ defmodule Outlawn.Market.BookTest do
     anton = make_ref()
     arnold = make_ref()
 
-    {:ok, []} =
+    {:ok, {id_1, _, _, _}, []} =
       book
-      |> Outlawn.Market.Book.place_order(arnold, :buy, {D.new("59.01"), 100})
-    {:ok, []} =
+      |> Outlawn.Market.Book.place_order(:buy, {D.new("59.01"), 100, arnold})
+    price_2 = D.new("59.49")
+    {:ok, _, []} =
       book
-      |> Outlawn.Market.Book.place_order(arnold, :buy, {D.new("59.49"), 100})
-    {:ok, []} =
+      |> Outlawn.Market.Book.place_order(:buy, {price_2, 100, arnold})
+    price_3 = D.new("59.5")
+    {:ok, _, []} =
       book
-      |> Outlawn.Market.Book.place_order(arnold, :buy, {D.new("59.5"), 100})
-    {:ok, executed} =
+      |> Outlawn.Market.Book.place_order(:buy, {price_3, 100, arnold})
+    {:ok, {id_4, _, _, _}, txns} =
       book
-      |> Outlawn.Market.Book.place_order(anton, :sell, {D.new("59.1"), 293})
+      |> Outlawn.Market.Book.place_order(:sell, {D.new("59.1"), 293, anton})
 
-    assert executed == [
-      {D.new("59.49"), 100, arnold},
-      {D.new("59.5"), 100, arnold}
-    ]
+    assert [
+      {_, ^price_2, 100},
+      {_, ^price_3, 100}
+    ] = txns
     assert book |> Outlawn.Market.Book.bids() == [
-      {D.new("59.01"), 100, arnold}
+      {id_1, D.new("59.01"), 100, arnold}
     ]
     assert book |> Outlawn.Market.Book.asks() == [
-      {D.new("59.1"), 93, anton}
+      {id_4, D.new("59.1"), 93, anton}
     ]
   end
 end

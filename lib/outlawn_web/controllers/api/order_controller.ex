@@ -30,10 +30,31 @@ defmodule OutlawnWeb.API.OrderController do
           end
         price = Decimal.new(price_string)
 
-        {:ok, executed} = book_pid |> Market.Book.place_order(user.id, action, {price, amount})
+        {:ok, order, txns} =
+          book_pid
+          |> Market.Book.place_order(action, {price, amount, user.id})
 
         conn
-        |> render("executed.json", executed: executed)
+        |> render("order_executed.json", order: order, txns: txns)
+      _ ->
+        conn
+        |> render("error.json", :no_book)
+    end
+  end
+
+  def delete(conn, %{"book_id" => book_id, "id" => order_id}) do
+    case book_id |> book_pid() do
+      {:ok, book_pid} ->
+        user = conn.assigns[:current_user]
+
+        case book_pid |> Market.Book.delete_order(order_id, user.id) do
+          {:ok, order} ->
+            conn
+            |> render("order.json", order: order)
+          :error ->
+            conn
+            |> render("error.json", :no_order)
+        end
       _ ->
         conn
         |> render("error.json", :no_book)

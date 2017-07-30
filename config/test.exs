@@ -29,4 +29,4 @@ config :outlawn, Outlawn.Access,
   }
 
 config :bcrypt_elixir,
-  log_rounds: 4
+  log_rounds: 2

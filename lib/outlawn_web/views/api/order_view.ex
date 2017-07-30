@@ -10,12 +10,17 @@ defmodule OutlawnWeb.API.OrderView do
     }
   end
 
-  def render("executed.json", %{executed: executed}) when is_list(executed) do
-    %{status: "ok"}
+  def render("order.json", %{order: order}) do
+    %{order: one(order)}
   end
 
-  def one({price, amount, _}) do
+  def render("order_executed.json", %{order: order, txns: txns}) when is_list(txns) do
+    %{order: one(order)}
+  end
+
+  def one({id, price, amount, _}) do
     %{
+      id: id,
       price: price,
       amount: amount
     }
