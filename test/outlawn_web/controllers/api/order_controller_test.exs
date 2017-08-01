@@ -1,22 +1,14 @@
 defmodule OutlawnWeb.API.OrderControllerTest do
   use OutlawnWeb.ConnCase
+  import Outlawn.RecordFactory
 
-  alias Outlawn.{User, Repo, Access, Market}
+  alias Outlawn.{User, Access, Market}
 
   test "shows trader's current orders", %{conn: conn} do
-    buyer =
-      %User{}
-      |> User.changeset(%{username: "bessie", password: "coltrane", password_confirmation: "coltrane"})
-      |> Repo.insert!()
+    buyer = create_record(User, %{username: "bessie"})
+    seller = create_record(User, %{username: "nature_boy"})
 
-    seller =
-      %User{}
-      |> User.changeset(%{username: "nature_boy", password: "coltrane", password_confirmation: "coltrane"})
-      |> Repo.insert!()
-
-    token =
-      buyer
-      |> Access.issue_token(:full)
+    token = buyer |> Access.issue_token(:full)
 
     {:ok, book} = Market.create_book({:eth, :btc})
 
@@ -41,14 +33,9 @@ defmodule OutlawnWeb.API.OrderControllerTest do
   end
 
   test "places an order", %{conn: conn} do
-    buyer =
-      %User{}
-      |> User.changeset(%{username: "jordan", password: "peterson", password_confirmation: "peterson"})
-      |> Repo.insert!()
+    buyer = create_record(User, %{username: "jordan"})
 
-    token =
-      buyer
-      |> Access.issue_token(:full)
+    token = buyer |> Access.issue_token(:full)
 
     {:ok, book} = Market.create_book({:xmr, :btc})
 
@@ -85,15 +72,8 @@ defmodule OutlawnWeb.API.OrderControllerTest do
   end
 
   test "removes an order", %{conn: conn} do
-    buyer =
-      %User{}
-      |> User.changeset(%{username: "chuck", password: "bobbyaxelrod", password_confirmation: "bobbyaxelrod"})
-      |> Repo.insert!()
-
-    seller =
-      %User{}
-      |> User.changeset(%{username: "wendy", password: "dollarbill", password_confirmation: "dollarbill"})
-      |> Repo.insert!()
+    buyer = create_record(User, %{username: "chuck"})
+    seller = create_record(User, %{username: "wendy"})
 
     token =
       buyer

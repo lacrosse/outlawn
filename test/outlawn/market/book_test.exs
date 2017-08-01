@@ -1,42 +1,36 @@
-defmodule Outlawn.Market.BookTest do
+defmodule BookTest do
   use Outlawn.DataCase
-
-  alias Outlawn.{User, Repo}
-
   require Decimal, as: D
+  import Outlawn.RecordFactory
+
+  alias Outlawn.Market.Book
 
   setup do
-    {:ok, book} = start_supervised({Outlawn.Market.Book, {:usd, :rub}})
+    {:ok, book} = start_supervised({Book, {:usd, :rub}})
 
-    %User{id: anton} =
-      %User{}
-      |> User.changeset(%{username: "anton", password: "findherfiner", password_confirmation: "findherfiner"})
-      |> Repo.insert!()
-    %User{id: arnold} =
-      %User{}
-      |> User.changeset(%{username: "arnold", password: "zootallures", password_confirmation: "zootallures"})
-      |> Repo.insert!()
+    anton = create_record(Outlawn.User, %{ username: "anton" })
+    arnold = create_record(Outlawn.User, %{ username: "arnold" })
 
-    %{book: book, anton: anton, arnold: arnold}
+    %{book: book, anton: anton.id, arnold: arnold.id}
   end
 
   test "starts with empty order book", %{book: book} do
-    assert book |> Outlawn.Market.Book.asks() == []
-    assert book |> Outlawn.Market.Book.bids() == []
+    assert book |> Book.asks() == []
+    assert book |> Book.bids() == []
   end
 
   test "queues a bid when asks are unaffordable", %{book: book, anton: anton, arnold: arnold} do
     {:ok, {id_1, _, _, _}, []} =
       book
-      |> Outlawn.Market.Book.place_order(:sell, {D.new("59.01"), 10000, arnold})
+      |> Book.place_order(:sell, {D.new("59.01"), 10000, arnold})
     {:ok, {id_2, _, _, _}, []} =
       book
-      |> Outlawn.Market.Book.place_order(:buy, {D.new("59.0"), 100, anton})
+      |> Book.place_order(:buy, {D.new("59.0"), 100, anton})
 
-    assert book |> Outlawn.Market.Book.bids() == [
+    assert book |> Book.bids() == [
       {id_2, D.new("59.0"), 100, anton}
     ]
-    assert book |> Outlawn.Market.Book.asks() == [
+    assert book |> Book.asks() == [
       {id_1, D.new("59.01"), 10000, arnold}
     ]
   end
@@ -46,14 +40,14 @@ defmodule Outlawn.Market.BookTest do
 
     {:ok, {id_1, _, _, _}, []} =
       book
-      |> Outlawn.Market.Book.place_order(:sell, {price, 10000, arnold})
+      |> Book.place_order(:sell, {price, 10000, arnold})
     {:ok, _, txns} =
       book
-      |> Outlawn.Market.Book.place_order(:buy, {D.new("59.1"), 100, anton})
+      |> Book.place_order(:buy, {D.new("59.1"), 100, anton})
 
     assert [{_, ^price, 100}] = txns
-    assert book |> Outlawn.Market.Book.bids() == []
-    assert book |> Outlawn.Market.Book.asks() == [
+    assert book |> Book.bids() == []
+    assert book |> Book.asks() == [
       {id_1, price, 9900, arnold}
     ]
   end
@@ -61,27 +55,27 @@ defmodule Outlawn.Market.BookTest do
   test "executes several bids when asks are available", %{book: book, anton: anton, arnold: arnold} do
     {:ok, {id_1, _, _, _}, []} =
       book
-      |> Outlawn.Market.Book.place_order(:sell, {D.new("59.5"), 100, arnold})
+      |> Book.place_order(:sell, {D.new("59.5"), 100, arnold})
     price_2 = D.new("59.02")
     {:ok, _, []} =
       book
-      |> Outlawn.Market.Book.place_order(:sell, {price_2, 100, arnold})
+      |> Book.place_order(:sell, {price_2, 100, arnold})
     price_3 = D.new("59.01")
     {:ok, _, []} =
       book
-      |> Outlawn.Market.Book.place_order(:sell, {price_3, 100, arnold})
+      |> Book.place_order(:sell, {price_3, 100, arnold})
     {:ok, {id_4, _, _, _}, txns} =
       book
-      |> Outlawn.Market.Book.place_order(:buy, {D.new("59.1"), 293, anton})
+      |> Book.place_order(:buy, {D.new("59.1"), 293, anton})
 
     assert [
       {_, ^price_2, 100},
       {_, ^price_3, 100}
     ] = txns
-    assert book |> Outlawn.Market.Book.bids() == [
+    assert book |> Book.bids() == [
       {id_4, D.new("59.1"), 93, anton}
     ]
-    assert book |> Outlawn.Market.Book.asks() == [
+    assert book |> Book.asks() == [
       {id_1, D.new("59.5"), 100, arnold}
     ]
   end
@@ -89,27 +83,27 @@ defmodule Outlawn.Market.BookTest do
   test "executes several asks when bids are available", %{book: book, anton: anton, arnold: arnold} do
     {:ok, {id_1, _, _, _}, []} =
       book
-      |> Outlawn.Market.Book.place_order(:buy, {D.new("59.01"), 100, arnold})
+      |> Book.place_order(:buy, {D.new("59.01"), 100, arnold})
     price_2 = D.new("59.49")
     {:ok, _, []} =
       book
-      |> Outlawn.Market.Book.place_order(:buy, {price_2, 100, arnold})
+      |> Book.place_order(:buy, {price_2, 100, arnold})
     price_3 = D.new("59.5")
     {:ok, _, []} =
       book
-      |> Outlawn.Market.Book.place_order(:buy, {price_3, 100, arnold})
+      |> Book.place_order(:buy, {price_3, 100, arnold})
     {:ok, {id_4, _, _, _}, txns} =
       book
-      |> Outlawn.Market.Book.place_order(:sell, {D.new("59.1"), 293, anton})
+      |> Book.place_order(:sell, {D.new("59.1"), 293, anton})
 
     assert [
       {_, ^price_2, 100},
       {_, ^price_3, 100}
     ] = txns
-    assert book |> Outlawn.Market.Book.bids() == [
+    assert book |> Book.bids() == [
       {id_1, D.new("59.01"), 100, arnold}
     ]
-    assert book |> Outlawn.Market.Book.asks() == [
+    assert book |> Book.asks() == [
       {id_4, D.new("59.1"), 93, anton}
     ]
   end
