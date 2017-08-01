@@ -3,7 +3,7 @@ defmodule Outlawn.Market.Supervisor do
     import Supervisor.Spec
 
     children = [
-      supervisor(Outlawn.Market, []),
+      supervisor(Outlawn.Market.BookRegistry, []),
       supervisor(Outlawn.Market.BookSupervisor, [])
     ]
 
