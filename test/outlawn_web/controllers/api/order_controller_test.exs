@@ -1,5 +1,5 @@
 defmodule OutlawnWeb.API.OrderControllerTest do
-  use OutlawnWeb.ConnCase, async: true
+  use OutlawnWeb.ConnCase
 
   alias Outlawn.{User, Repo, Access, Market}
 

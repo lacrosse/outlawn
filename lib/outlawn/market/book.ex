@@ -2,7 +2,7 @@
 defmodule Outlawn.Market.Book do
   use GenServer, restart: :temporary
 
-  alias Outlawn.Accounting
+  alias Outlawn.{Market, Accounting}
 
   def start_link(inst) do
     GenServer.start_link(__MODULE__, %{inst: inst, asks: [], bids: []})
@@ -60,7 +60,11 @@ defmodule Outlawn.Market.Book do
     {:reply, val, new_state}
   end
 
-  defp match_and_queue_order(%{inst: book_id, asks: asks, bids: bids} = state, action, {price, amount, trader}) do
+  defp match_and_queue_order(
+    %{inst: {to_inst, from_inst} = book_id, asks: asks, bids: bids} = state,
+    action,
+    {price, amount, trader}
+  ) do
     asks_tuple = {:asks, asks}
     bids_tuple = {:bids, bids}
 
@@ -70,22 +74,47 @@ defmodule Outlawn.Market.Book do
         :sell -> {bids_tuple, asks_tuple}
       end
 
-    id = Ecto.UUID.generate()
+    sign =
+      case action do
+        :sell -> -1
+        :buy -> 1
+      end
 
-    order_with_id =
-      {id, price, amount, trader}
+    order_changeset =
+      %Market.Order{}
+      |> Market.Order.changeset(trader, %{
+        to: to_inst |> to_string(),
+        from: from_inst |> to_string(),
+        price: price,
+        amount: sign * amount
+      })
 
-    {taken, remaining_order, txns} =
-      to_take
-      |> match_order(book_id, action, order_with_id)
-    made =
-      to_make
-      |> queue_order(action, remaining_order)
-    new_state =
-      state
-      |> Map.merge(%{to_take_symbol => taken, to_make_symbol => made})
+    multi =
+      Ecto.Multi.new()
+      |> Ecto.Multi.insert(:order, order_changeset)
+      |> Ecto.Multi.run(:book_order, fn %{order: order_record} ->
+        order_with_id = {order_record.id, price, amount, trader}
+        {:ok, order_with_id}
+      end)
+      |> Ecto.Multi.run(:taken_tuple, fn %{book_order: book_order} ->
+        tuple = to_take |> match_order(book_id, action, book_order)
+        {:ok, tuple}
+      end)
+      |> Ecto.Multi.run(:made, fn %{taken_tuple: {_, remaining_order, _}} ->
+        made = to_make |> queue_order(action, remaining_order)
+        {:ok, made}
+      end)
 
-    {remaining_order, txns, new_state}
+    case multi |> Outlawn.Repo.transaction() do
+      {:ok, %{taken_tuple: taken_tuple, made: made}} ->
+        {taken, remaining_order, txns} = taken_tuple
+
+        new_state =
+          state
+          |> Map.merge(%{to_take_symbol => taken, to_make_symbol => made})
+
+        {remaining_order, txns, new_state}
+    end
   end
 
   defp match_order(list, book_id, action, order, txns \\ [])

@@ -1,11 +1,23 @@
 defmodule Outlawn.Market.BookTest do
-  use ExUnit.Case, async: true
+  use Outlawn.DataCase
+
+  alias Outlawn.{User, Repo}
 
   require Decimal, as: D
 
   setup do
     {:ok, book} = start_supervised({Outlawn.Market.Book, {:usd, :rub}})
-    %{book: book}
+
+    %User{id: anton} =
+      %User{}
+      |> User.changeset(%{username: "anton", password: "findherfiner", password_confirmation: "findherfiner"})
+      |> Repo.insert!()
+    %User{id: arnold} =
+      %User{}
+      |> User.changeset(%{username: "arnold", password: "zootallures", password_confirmation: "zootallures"})
+      |> Repo.insert!()
+
+    %{book: book, anton: anton, arnold: arnold}
   end
 
   test "starts with empty order book", %{book: book} do
@@ -13,10 +25,7 @@ defmodule Outlawn.Market.BookTest do
     assert book |> Outlawn.Market.Book.bids() == []
   end
 
-  test "queues a bid when asks are unaffordable", %{book: book} do
-    anton = make_ref()
-    arnold = make_ref()
-
+  test "queues a bid when asks are unaffordable", %{book: book, anton: anton, arnold: arnold} do
     {:ok, {id_1, _, _, _}, []} =
       book
       |> Outlawn.Market.Book.place_order(:sell, {D.new("59.01"), 10000, arnold})
@@ -32,10 +41,7 @@ defmodule Outlawn.Market.BookTest do
     ]
   end
 
-  test "executes a bid when ask is available", %{book: book} do
-    anton = make_ref()
-    arnold = make_ref()
-
+  test "executes a bid when ask is available", %{book: book, anton: anton, arnold: arnold} do
     price = D.new("59.01")
 
     {:ok, {id_1, _, _, _}, []} =
@@ -52,10 +58,7 @@ defmodule Outlawn.Market.BookTest do
     ]
   end
 
-  test "executes several bids when asks are available", %{book: book} do
-    anton = make_ref()
-    arnold = make_ref()
-
+  test "executes several bids when asks are available", %{book: book, anton: anton, arnold: arnold} do
     {:ok, {id_1, _, _, _}, []} =
       book
       |> Outlawn.Market.Book.place_order(:sell, {D.new("59.5"), 100, arnold})
@@ -83,10 +86,7 @@ defmodule Outlawn.Market.BookTest do
     ]
   end
 
-  test "executes several asks when bids are available", %{book: book} do
-    anton = make_ref()
-    arnold = make_ref()
-
+  test "executes several asks when bids are available", %{book: book, anton: anton, arnold: arnold} do
     {:ok, {id_1, _, _, _}, []} =
       book
       |> Outlawn.Market.Book.place_order(:buy, {D.new("59.01"), 100, arnold})
