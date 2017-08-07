@@ -78,4 +78,5 @@ defmodule Outlawn.Market.BookRegistry do
   defp inst_string_to_symbol("ETH"), do: :eth
   defp inst_string_to_symbol("XMR"), do: :xmr
   defp inst_string_to_symbol("BTC"), do: :btc
+  defp inst_string_to_symbol("BCC"), do: :bcc
 end
