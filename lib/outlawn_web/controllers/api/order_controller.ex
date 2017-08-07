@@ -22,17 +22,13 @@ defmodule OutlawnWeb.API.OrderController do
       {:ok, book_pid} ->
         user = conn.assigns[:current_user]
 
-        %{"action" => action_string, "price" => price_string, "amount" => amount} = order_params
-        action =
-          case action_string do
-            "sell" -> :sell
-            "buy" -> :buy
-          end
+        %{"price" => price_string, "amount" => amount} = order_params
+
         price = Decimal.new(price_string)
 
         {:ok, order, txns} =
           book_pid
-          |> Market.Book.place_order(action, {price, amount, user.id})
+          |> Market.Book.place_order({price, amount, user.id})
 
         conn
         |> render("order_executed.json", order: order, txns: txns)

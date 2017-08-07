@@ -15,7 +15,7 @@ defmodule Outlawn.Market.Book do
 
   def lowest_ask(book), do: book |> GenServer.call(:lowest_ask)
   def highest_bid(book), do: book |> GenServer.call(:highest_bid)
-  def place_order(book, action, order), do: book |> GenServer.call({:place_order, action, order})
+  def place_order(book, order), do: book |> GenServer.call({:place_order, order})
   def delete_order(book, order_id, trader), do: book |> GenServer.call({:delete_order, order_id, trader})
 
   # Server
@@ -30,15 +30,24 @@ defmodule Outlawn.Market.Book do
 
     {:reply, orders, s}
   end
-  def handle_call(:asks, _from, %{asks: a} = s), do: {:reply, a, s}
-  def handle_call(:bids, _from, %{bids: b} = s), do: {:reply, b, s}
-  def handle_call(:lowest_ask, _from, %{asks: a} = s), do: {:reply, first_or_none(a), s}
-  def handle_call(:highest_bid, _from, %{bids: b} = s), do: {:reply, first_or_none(b), s}
-  def handle_call({:place_order, action, order}, _from, state) do
-    {remaining_order, txns, new_state} = match_and_queue_order(state, action, order)
 
-    {:reply, {:ok, remaining_order, txns}, new_state}
+  def handle_call(:asks, _from, %{asks: a} = s), do: {:reply, a, s}
+
+  def handle_call(:bids, _from, %{bids: b} = s), do: {:reply, b, s}
+
+  def handle_call(:lowest_ask, _from, %{asks: a} = s), do: {:reply, first_or_none(a), s}
+
+  def handle_call(:highest_bid, _from, %{bids: b} = s), do: {:reply, first_or_none(b), s}
+
+  def handle_call({:place_order, order}, _from, state) do
+    case match_and_queue_order(state, order) do
+      {:ok, remaining_order, txns, new_state} ->
+        {:reply, {:ok, remaining_order, txns}, new_state}
+      :error ->
+        {:reply, :error, state}
+    end
   end
+
   def handle_call({:delete_order, order_id, trader}, _from, %{asks: asks, bids: bids} = state) do
     {val, new_state} =
       case asks |> dequeue_order(order_id, trader) do
@@ -62,22 +71,17 @@ defmodule Outlawn.Market.Book do
 
   defp match_and_queue_order(
     %{inst: {to_inst, from_inst} = book_id, asks: asks, bids: bids} = state,
-    action,
     {price, amount, trader}
   ) do
     asks_tuple = {:asks, asks}
     bids_tuple = {:bids, bids}
 
     {{to_take_symbol, to_take}, {to_make_symbol, to_make}} =
-      case action do
-        :buy -> {asks_tuple, bids_tuple}
-        :sell -> {bids_tuple, asks_tuple}
-      end
-
-    sign =
-      case action do
-        :sell -> -1
-        :buy -> 1
+      cond do
+        amount > 0 ->
+          {asks_tuple, bids_tuple}
+        amount < 0 ->
+          {bids_tuple, asks_tuple}
       end
 
     order_changeset =
@@ -86,7 +90,7 @@ defmodule Outlawn.Market.Book do
         to: to_inst |> to_string(),
         from: from_inst |> to_string(),
         price: price,
-        amount: sign * amount
+        amount: amount
       })
 
     multi =
@@ -97,11 +101,15 @@ defmodule Outlawn.Market.Book do
         {:ok, order_with_id}
       end)
       |> Ecto.Multi.run(:taken_tuple, fn %{book_order: book_order} ->
-        tuple = to_take |> match_order(book_id, action, book_order)
-        {:ok, tuple}
+        case match_order(book_id, to_take, book_order) do
+          {:ok, market, order, txns} ->
+            {:ok, {market, order, txns}}
+          :error ->
+            {:error, book_order}
+        end
       end)
       |> Ecto.Multi.run(:made, fn %{taken_tuple: {_, remaining_order, _}} ->
-        made = to_make |> queue_order(action, remaining_order)
+        made = to_make |> queue_order(remaining_order)
         {:ok, made}
       end)
 
@@ -113,56 +121,80 @@ defmodule Outlawn.Market.Book do
           state
           |> Map.merge(%{to_take_symbol => taken, to_make_symbol => made})
 
-        {remaining_order, txns, new_state}
+        {:ok, remaining_order, txns, new_state}
+      {:error, _key, _changeset, _them_changes} ->
+        :error
     end
   end
 
-  defp match_order(list, book_id, action, order, txns \\ [])
-  defp match_order([], _, _, order, txns), do: {[], order, txns}
-  defp match_order(list, _, _, {_, _, 0, _}, txns), do: {list, nil, txns}
+  defp match_order(list, book_id, order, txn_trails \\ [])
+  defp match_order(_, [], order, txn_trails), do: {:ok, [], order, txn_trails}
+  defp match_order(_, list, {_, _, 0, _}, txn_trails), do: {:ok, list, nil, txn_trails}
   defp match_order(
+    {other_inst, base_inst} = book_id,
     [{m_id, m_price, m_amount, m_trader}|m_tail] = market,
-    book_id,
-    action,
     {t_id, t_price, t_amount, t_trader} = t_order,
-    txns
+    txn_trails
   ) do
-    comparison_symbol = action_to_take_comparison(action)
+    action = sign(t_amount)
 
-    case Decimal.cmp(m_price, t_price) do
-      ^comparison_symbol ->
-        {market, t_order, txns}
+    case Decimal.compare(t_price, m_price).sign * action do
+      -1 ->
+        {:ok, market, t_order, txn_trails}
       _ ->
-        cond do
-          m_amount == t_amount ->
-            txn = Accounting.Transaction.create(book_id, m_price, m_amount, m_trader, t_trader)
-            {m_tail, nil, [txn|txns]}
-          m_amount > t_amount ->
-            txn = Accounting.Transaction.create(book_id, m_price, t_amount, m_trader, t_trader)
-            market_order_remainder = {m_id, m_price, m_amount - t_amount, m_trader}
-            {[market_order_remainder|m_tail], nil, [txn|txns]}
-          m_amount < t_amount ->
-            txn = Accounting.Transaction.create(book_id, m_price, m_amount, m_trader, t_trader)
-            taker_order_remainder = {t_id, t_price, t_amount - m_amount, t_trader}
-            match_order(m_tail, book_id, action, taker_order_remainder, [txn|txns])
+        surplus = t_amount + m_amount
+        t_remainder = {t_id, t_price, surplus, t_trader}
+        m_remainder = {m_id, m_price, surplus, m_trader}
+
+        dec_m_amount = Decimal.new(m_amount)
+        dec_base_amount = dec_m_amount |> Decimal.mult(m_price)
+        txns_result =
+          Ecto.Multi.append(
+            Accounting.Transaction.double_entry_multi(other_inst, dec_m_amount, {t_trader, t_id}, {m_trader, m_id}),
+            Accounting.Transaction.double_entry_multi(base_inst, dec_base_amount, {m_trader, m_id}, {t_trader, t_id})
+          )
+          |> Outlawn.Repo.transaction()
+
+        case sign(surplus * action) do
+          0 ->
+            case txns_result do
+              {:ok, _} ->
+                {:ok, m_tail, t_remainder, [{m_price, m_amount}|txn_trails]}
+              {:error, _, _, _} ->
+                :error
+            end
+          -1 ->
+            case txns_result do
+              {:ok, _} ->
+                {:ok, [m_remainder|m_tail], nil, [{m_price, t_amount}|txn_trails]}
+              {:error, _, _, _} ->
+                :error
+            end
+          1 ->
+            case txns_result do
+              {:ok, _} ->
+                match_order(book_id, m_tail, t_remainder, [{m_price, m_amount}|txn_trails])
+              {:error, _, _, _} ->
+                :error
+            end
         end
     end
   end
 
-  defp queue_order(market, action, order) do
-    {lead, tail} = queue_order(market, action, order, [])
+  defp queue_order(market, order) do
+    {lead, tail} = queue_order(market, order, [])
     Enum.reduce(lead, tail, &[&1|&2])
   end
-  defp queue_order(market, _, nil, lead), do: {lead, market}
-  defp queue_order([], _, order, lead), do: {lead, [order]}
-  defp queue_order([{_, m_price, _, _} = m_order|m_tail] = market, action, {_, t_price, _, _} = t_order, lead) do
-    comparison_symbol = action_to_make_comparison(action)
+  defp queue_order(market, nil, lead), do: {lead, market}
+  defp queue_order([], order, lead), do: {lead, [order]}
+  defp queue_order([{_, m_price, _, _} = m_order|m_tail] = market, {_, t_price, t_amount, _} = t_order, lead) do
+    action = sign(t_amount)
 
-    case Decimal.cmp(m_price, t_price) do
-      ^comparison_symbol ->
+    case Decimal.compare(t_price, m_price).sign * action do
+      1 ->
         {lead, [t_order|market]}
       _ ->
-        queue_order(m_tail, :buy, t_order, [m_order|lead])
+        queue_order(m_tail, t_order, [m_order|lead])
     end
   end
 
@@ -179,14 +211,13 @@ defmodule Outlawn.Market.Book do
   defp dequeue_order([{o_id, _, _, _}|_], o_id, _, _), do: :halt
   defp dequeue_order([m_order|m_tail], o_id, trader, lead), do: dequeue_order(m_tail, o_id, trader, [m_order|lead])
 
-  defp action_to_take_comparison(:buy), do: :gt
-  defp action_to_take_comparison(:sell), do: :lt
-
-  defp action_to_make_comparison(:buy), do: :lt
-  defp action_to_make_comparison(:sell), do: :gt
-
   defp first_or_none([item|_]), do: item
   defp first_or_none(_), do: :none
 
   defp filter_by_trader(list, trader), do: Enum.filter(list, fn {_, _, _, t} -> t == trader end)
+
+  @compile {:inline, sign: 1}
+  defp sign(0), do: 0
+  defp sign(n) when n > 0, do: 1
+  defp sign(n) when n < 0, do: -1
 end

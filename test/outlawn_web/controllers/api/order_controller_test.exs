@@ -5,19 +5,19 @@ defmodule OutlawnWeb.API.OrderControllerTest do
   alias Outlawn.{User, Access, Market}
 
   test "shows trader's current orders", %{conn: conn} do
-    buyer = create_record(User, %{username: "bessie"})
-    seller = create_record(User, %{username: "nature_boy"})
+    buyer = create_record!(User, %{username: "bessie"})
+    seller = create_record!(User, %{username: "nature_boy"})
 
     token = buyer |> Access.issue_token(:full)
 
     {:ok, book} = Market.create_book({:eth, :btc})
 
     book
-    |> Market.Book.place_order(:sell, {Decimal.new("0.08"), 1, seller.id})
+    |> Market.Book.place_order({Decimal.new("0.08"), -1, seller.id})
 
     {:ok, {o_id, _, _, _}, _} =
       book
-      |> Market.Book.place_order(:buy, {Decimal.new("0.08"), 2, buyer.id})
+      |> Market.Book.place_order({Decimal.new("0.08"), 2, buyer.id})
 
     conn =
       conn
@@ -33,7 +33,7 @@ defmodule OutlawnWeb.API.OrderControllerTest do
   end
 
   test "places an order", %{conn: conn} do
-    buyer = create_record(User, %{username: "jordan"})
+    buyer = create_record!(User, %{username: "jordan"})
 
     token = buyer |> Access.issue_token(:full)
 
@@ -41,7 +41,7 @@ defmodule OutlawnWeb.API.OrderControllerTest do
 
     {:ok, {id_1, _, _, _}, _} =
       book
-      |> Market.Book.place_order(:buy, {Decimal.new("0.015"), 3, buyer.id})
+      |> Market.Book.place_order({Decimal.new("0.015"), 3, buyer.id})
 
     body = %{
       order: %{
@@ -72,8 +72,8 @@ defmodule OutlawnWeb.API.OrderControllerTest do
   end
 
   test "removes an order", %{conn: conn} do
-    buyer = create_record(User, %{username: "chuck"})
-    seller = create_record(User, %{username: "wendy"})
+    buyer = create_record!(User, %{username: "chuck"})
+    seller = create_record!(User, %{username: "wendy"})
 
     token =
       buyer
@@ -82,11 +82,11 @@ defmodule OutlawnWeb.API.OrderControllerTest do
     {:ok, book} = Market.create_book({:eth, :xmr})
 
     book
-    |> Market.Book.place_order(:sell, {Decimal.new("8.4"), 7, seller.id})
+    |> Market.Book.place_order({Decimal.new("8.4"), -7, seller.id})
 
     {:ok, {order_id, _, _, _}, _} =
       book
-      |> Market.Book.place_order(:buy, {Decimal.new("8.5"), 100, buyer.id})
+      |> Market.Book.place_order({Decimal.new("8.5"), 100, buyer.id})
 
     conn =
       conn
