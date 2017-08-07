@@ -42,7 +42,7 @@ defmodule Outlawn.Market.Book do
   def handle_call({:place_order, order}, _from, state) do
     case match_and_queue_order(state, order) do
       {:ok, remaining_order, txns, new_state} ->
-        {:reply, {:ok, remaining_order, txns}, new_state} |> IO.inspect
+        {:reply, {:ok, remaining_order, txns}, new_state}
       :error ->
         {:reply, :error, state}
     end
