@@ -1,0 +1,19 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/elixir:1.5.1
+      - image: circleci/postgres:9.6.3
+        environment:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: outlawn_test
+    environment:
+      MIX_ENV: test
+    steps:
+      - checkout
+      - run: mix local.hex --force
+      - run: mix local.rebar --force
+      - run: mix deps.get
+      - run: mix ecto.setup
+      - run: mix test
