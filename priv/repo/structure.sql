@@ -61,6 +61,20 @@ CREATE TABLE schema_migrations (
 
 
 --
+-- Name: transactions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE transactions (
+    id uuid NOT NULL,
+    amount numeric,
+    instrument character varying(255),
+    order_id uuid,
+    user_id integer,
+    inserted_at timestamp without time zone NOT NULL
+);
+
+
+--
 -- Name: users; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -116,6 +130,14 @@ ALTER TABLE ONLY schema_migrations
 
 
 --
+-- Name: transactions transactions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY transactions
+    ADD CONSTRAINT transactions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -128,6 +150,20 @@ ALTER TABLE ONLY users
 --
 
 CREATE INDEX orders_trader_id_index ON orders USING btree (trader_id);
+
+
+--
+-- Name: transactions_order_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX transactions_order_id_index ON transactions USING btree (order_id);
+
+
+--
+-- Name: transactions_user_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX transactions_user_id_index ON transactions USING btree (user_id);
 
 
 --
@@ -146,8 +182,24 @@ ALTER TABLE ONLY orders
 
 
 --
+-- Name: transactions transactions_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY transactions
+    ADD CONSTRAINT transactions_order_id_fkey FOREIGN KEY (order_id) REFERENCES orders(id);
+
+
+--
+-- Name: transactions transactions_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY transactions
+    ADD CONSTRAINT transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id);
+
+
+--
 -- PostgreSQL database dump complete
 --
 
-INSERT INTO "schema_migrations" (version) VALUES (20170728143938), (20170728144446), (20170801023433), (20170801035601);
+INSERT INTO "schema_migrations" (version) VALUES (20170728143938), (20170728144446), (20170801023433), (20170801035601), (20170801061455);
 
